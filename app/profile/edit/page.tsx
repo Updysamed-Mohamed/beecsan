@@ -38,7 +38,7 @@ export default function EditProfilePage() {
     if (user) {
       const initialData = {
         fullName: user.fullName || '',
-        phoneNumber: user.phoneNumber || '',
+        phoneNumber: user.phone || '',
         location: user.location || '',
         bio: user.bio || '',
       };
