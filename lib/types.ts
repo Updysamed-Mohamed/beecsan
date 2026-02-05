@@ -66,6 +66,7 @@
 // }
 
 export interface User {
+  status: string;
   id: any;
   displayName: string;
   uid: string;

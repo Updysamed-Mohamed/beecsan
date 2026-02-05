@@ -18,64 +18,44 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   setError('');
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(''); // Nadiifi khaladaadkii hore
 
-  //   // Basic Validation
-  //   if (!email.includes('@')) return setError('Fadlan geli email sax ah.');
-  //   if (password.length < 6) return setError('Password-ku waa inuu ka badnaadaa 6 harfood.');
+    try {
+      // 1. Marka hore soo xaqiiji login-ka (Firebase Auth)
+      const loggedInUser = await login(email.toLowerCase().trim(), password);
 
-  //   setIsSubmitting(true);
+      // 2. Hubi haddii isticmaaluhu yahay "blocked"
+      if (loggedInUser?.status === 'blocked') {
+        // Halkan waxaad u baahan kartaa inaad Logout ka dhigto si uusan session-ku u sii furnaan
+        // await logout(); 
+        setError('Akoonkan waa la xanibay (Blocked). Fadlan la xidhiidh maamulka.');
+        setIsSubmitting(false);
+        return; // Ha u ogolaan inuu horey u sii socdo
+      }
 
-  //  try {
-  //     // 1. Samee Login-ka oo hel xogta user-ka (ay ku jirto role-ka)
-  //     const loggedInUser = await login(email.toLowerCase().trim(), password);
-      
-  //     // 2. Hubi Role-ka si aad u go'aamiso halka loo dirayo
-  //     if (loggedInUser?.role === 'admin') {
-  //       router.push('/admin'); // Haddii uu Admin yahay
-  //     } else {
-  //       router.push('/'); // Haddii uu User caadi yahay
-  //     }
-      
-  //   } catch (err: any) {
-  //     // Logic-gaagii hore ee error-ka sideeda u daa
-  //     let msg = err.message || 'Email-ka ama Password-ka waa khalad';
-      
-  //     if (err.code === 'auth/user-not-found') msg = 'Account-kan lama helin.';
-  //     if (err.code === 'auth/wrong-password') msg = 'Password-ka waa khalad.';
-  //     if (err.code === 'auth/too-many-requests') msg = 'Isku day badan ayaa dhacay. Sug xoogaa.';
-      
-  //     setError(msg);
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
-  const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  console.log("--- LOGIN DEBUG ---");
-  console.log("Isku dayaya inuu galo:", email);
+      console.log("Login Success! Role laga helay:", loggedInUser?.role);
 
-  try {
-    const loggedInUser = await login(email.toLowerCase().trim(), password);
-    console.log("Login Success! Role laga helay:", loggedInUser?.role);
-
-    if (loggedInUser?.role === 'admin') {
-      console.log("Wareejinaya: /admin (Using replace)");
-      window.location.replace('/admin'); 
-    } else {
-      console.log("Wareejinaya: / (User caadi ah)");
-      window.location.replace('/');
+      // 3. Wareejinta (Redirection) haddii uusan blocked ahayn
+      if (loggedInUser?.role === 'admin') {
+        window.location.replace('/admin'); 
+      } else {
+        window.location.replace('/');
+      }
+    } catch (err: any) {
+      console.error("Login Error:", err.message);
+      // Halkan waxaad ku habayn kartaa fariimaha khaldan ee ka imanaya Firebase
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Email ama Password-ka waa khalad.');
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (err: any) {
-    console.error("Login Error:", err.message);
-    setError(err.message);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFBFC] px-4 py-8 overflow-hidden relative">
