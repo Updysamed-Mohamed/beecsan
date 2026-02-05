@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Header from '@/components/header';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
@@ -12,10 +13,14 @@ export default function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
 
-  if (!user) {
-    router.push('/auth/login');
-    return null;
-  }
+  // ✅ Redirect must be inside useEffect
+  useEffect(() => {
+    if (!user) {
+      router.push('/auth/login');
+    }
+  }, [user, router]);
+
+  if (!user) return null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -119,17 +124,30 @@ export default function Dashboard() {
                   <td className="py-3">iPhone 15 Pro Max</td>
                   <td className="py-3">$1,200</td>
                   <td className="py-3">342</td>
-                  <td className="py-3"><span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span></td>
+                  <td className="py-3">
+                    <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">
+                      Active
+                    </span>
+                  </td>
                   <td className="py-3">2 days ago</td>
-                  <td className="py-3 text-sm"><Button variant="ghost" size="sm">Edit</Button></td>
+                  <td className="py-3 text-sm">
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </td>
                 </tr>
+
                 <tr className="border-b border-border">
                   <td className="py-3">MacBook Pro 16&quot;</td>
                   <td className="py-3">$2,800</td>
                   <td className="py-3">187</td>
-                  <td className="py-3"><span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Active</span></td>
+                  <td className="py-3">
+                    <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">
+                      Active
+                    </span>
+                  </td>
                   <td className="py-3">5 days ago</td>
-                  <td className="py-3 text-sm"><Button variant="ghost" size="sm">Edit</Button></td>
+                  <td className="py-3 text-sm">
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </td>
                 </tr>
               </tbody>
             </table>

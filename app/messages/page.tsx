@@ -264,12 +264,46 @@
 
 // export default MessagesPage;
 
+// 'use client';
+
+// import React, { useState, useEffect, useRef, useMemo } from 'react';
+// import { useAuth } from '@/lib/auth-context';
+// import { Button } from '@/components/ui/button';
+// import { Send, Search, ArrowLeft, MoreVertical, MessageSquare, ShoppingBag } from 'lucide-react';
+// import Link from 'next/link';
+// import { useRouter, useSearchParams } from 'next/navigation';
+// import { db } from '@/lib/firebase';
+// import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+// import { getUser } from '@/lib/firestore-utils';
+// import type { Chat, Message, User } from '@/lib/types';
+
+// export default function MessagesPage() {
+//   const router = useRouter();
+//   const searchParams = useSearchParams();
+//   const { user, loading: authLoading } = useAuth();
+  
+//   const [chats, setChats] = useState<Chat[]>([]);
+//   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+//   const [messages, setMessages] = useState<Message[]>([]);
+//   const [messageText, setMessageText] = useState('');
+//   const [loading, setLoading] = useState(true);
+//   const [searchQuery, setSearchQuery] = useState('');
+//   const [userCache, setUserCache] = useState<Record<string, User>>({});
+//   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+//   // Xogta alaabta URL-ka (Params)
+//   const sId = searchParams.get('sellerId');
+//   const pTitle = searchParams.get('pTitle');
+//   const pImg = searchParams.get('pImg');
+//   const pPrice = searchParams.get('pPrice');
+//   const pId = searchParams.get('pId');
+
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
-import { Send, Search, ArrowLeft, MoreVertical, MessageSquare, ShoppingBag } from 'lucide-react';
+import { Send, Search, ArrowLeft, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
@@ -277,11 +311,11 @@ import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, ser
 import { getUser } from '@/lib/firestore-utils';
 import type { Chat, Message, User } from '@/lib/types';
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  
+
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -291,7 +325,7 @@ export default function MessagesPage() {
   const [userCache, setUserCache] = useState<Record<string, User>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Xogta alaabta URL-ka (Params)
+  // URL Params
   const sId = searchParams.get('sellerId');
   const pTitle = searchParams.get('pTitle');
   const pImg = searchParams.get('pImg');
@@ -538,3 +572,11 @@ export default function MessagesPage() {
   );
 }
 
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+      <MessagesContent />
+    </Suspense>
+  );
+}
