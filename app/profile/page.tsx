@@ -91,7 +91,7 @@ export default function ProfilePage() {
                 {user.isVerified && <ShieldCheck className="w-6 h-6 text-primary fill-primary" />}
               </div>
               
-              <div className="flex flex-wrap justify-center md:justify-start gap-8 mt-4">
+              {/* <div className="flex flex-wrap justify-center md:justify-start gap-8 mt-4">
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-muted-foreground uppercase">Listings</span>
                   <span className="text-2xl font-bold">{user.totalProducts || 0}</span>
@@ -107,7 +107,7 @@ export default function ProfilePage() {
                     <span className="text-2xl font-bold">{(user.rating || 0).toFixed(1)}</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             <Button 
@@ -135,13 +135,13 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-bold text-muted-foreground uppercase">Active Ads</p>
-                    <p className="text-2xl font-black">{user.activeAds || 0}</p>
+                    {/* <p className="text-2xl font-black">{user.activeAds || 0}</p> */}
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </button>
 
-              <button 
+              {/* <button 
                 onClick={() => router.push('/my-ads?status=expired')}
                 className="flex items-center justify-between p-6 bg-surface border rounded-3xl group transition-all"
               >
@@ -155,7 +155,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </button>
+              </button> */}
             </div>
           </div>
 

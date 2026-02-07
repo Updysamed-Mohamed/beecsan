@@ -548,6 +548,204 @@
 //   );
 // }
 
+// 'use client';
+
+// import React, { useState } from 'react';
+// import { useRouter } from 'next/navigation';
+// import { useAuth } from '@/lib/auth-context';
+// import { db } from '@/lib/firebase';
+// import { createClient } from '@supabase/supabase-js';
+// import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// import { Button } from '@/components/ui/button';
+// import { ArrowLeft, Upload, AlertCircle, X, CheckCircle2 } from 'lucide-react';
+
+// const supabase = createClient(
+//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// );
+
+// // Configuration la mid ah Database-kaaga
+// const categoryConfigs: Record<string, { label: string; fields: { name: string; label: string; type: string; placeholder: string }[] }> = {
+//   electronics: { 
+//     label: "Electronics", 
+//     fields: [
+//       { name: 'brand', label: 'Brand', type: 'text', placeholder: 'Tecno' },
+//       { name: 'model', label: 'Model', type: 'text', placeholder: 'm4' },
+//       { name: 'color', label: 'Color', type: 'text', placeholder: 'Black' }
+//     ] 
+//   },
+//   vehicles: { 
+//     label: "Vehicles", 
+//     fields: [
+//       { name: 'make', label: 'Nooca Gaariga', type: 'text', placeholder: 'Toyota' }, 
+//       { name: 'model', label: 'Model', type: 'text', placeholder: 'Corolla' }, 
+//       { name: 'year', label: 'Sanadka', type: 'text', placeholder: '2023' },
+//       { name: 'km', label: 'km', type: 'text', placeholder: '0' }
+//     ] 
+//   },
+//   // property: { 
+//   //   label: "Property", 
+//   //   fields: [
+//   //     { name: 'phone_verification', label: 'Phone', type: 'text', placeholder: '+252...' },
+//   //     { name: 'size', label: 'Size', type: 'text', placeholder: '120sqm' }
+//   //   ] 
+//   // },
+//   property: { 
+//     label: "Property & Real Estate", 
+//     fields: [
+//       { name: 'property_type', label: 'Nooca (House, Apartment, Land)', type: 'text', placeholder: 'e.g. Apartment' },
+//       { name: 'phone_verification', label: 'Phone Number', type: 'text', placeholder: '+252...' },
+//       { name: 'bedrooms', label: 'Qolalka Jiifka (Bedrooms)', type: 'text', placeholder: '3' },
+//       { name: 'bathrooms', label: 'Musqulaha (Bathrooms)', type: 'text', placeholder: '2' },
+//       { name: 'size', label: 'Baaxadda (Size)', type: 'text', placeholder: '120sqm ama 20x20' },
+//     ] 
+//   },
+//   furniture: { label: "Furniture", fields: [{ name: 'material', label: 'Maaddada', type: 'text', placeholder: 'Kursi' }] },
+//   fashions: { label: "Fashions", fields: [{ name: 'size', label: 'Size', type: 'text', placeholder: 'XL' }] },
+//   beauty: { label: "Beauty", fields: [{ name: 'type', label: 'Nooca', type: 'text', placeholder: 'Cream' }] },
+//   construction: { label: "Construction", fields: [{ name: 'item_type', label: 'Agabka', type: 'text', placeholder: 'Tools' }] },
+//   services: { label: "Services", fields: [{ name: 'service_type', label: 'Nooca Adeegga', type: 'text', placeholder: 'Maintenance' }] }
+// };
+
+// export default function CreateListingPage() {
+//   const router = useRouter();
+//   const { user } = useAuth();
+//   const [isSubmitting, setIsSubmitting] = useState(false);
+//   const [isSuccess, setIsSuccess] = useState(false);
+//   const [error, setError] = useState('');
+//   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  
+//   const [formData, setFormData] = useState({ 
+//     title: '', description: '', price: '', category: '', city: '', 
+//     condition: 'New', isNegotiable: false 
+//   });
+//   const [extraFields, setExtraFields] = useState<Record<string, string>>({});
+
+//   const compressImageNative = (file: File): Promise<Blob> => {
+//     return new Promise((resolve) => {
+//       const reader = new FileReader();
+//       reader.readAsDataURL(file);
+//       reader.onload = (e) => {
+//         const img = new Image();
+//         img.src = e.target?.result as string;
+//         img.onload = () => {
+//           const canvas = document.createElement('canvas');
+//           let w = img.width, h = img.height, max = 1200;
+//           if (w > h ? w > max : h > max) { if (w > h) { h *= max / w; w = max; } else { w *= max / h; h = max; } }
+//           canvas.width = w; canvas.height = h;
+//           canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
+//           canvas.toBlob((b) => resolve(b as Blob), 'image/jpeg', 0.8);
+//         };
+//       };
+//     });
+//   };
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     if (!user || selectedImages.length === 0) return setError("Fadlan sawir soo geli.");
+//     setIsSubmitting(true);
+
+//     try {
+//       const uploadPromises = selectedImages.map(async (file) => {
+//         const blob = await compressImageNative(file);
+//         const name = `${user.uid}/${Date.now()}-${Math.random().toString(36).substr(7)}.jpg`;
+//         await supabase.storage.from('product-images').upload(name, blob);
+//         return supabase.storage.from('product-images').getPublicUrl(name).data.publicUrl;
+//       });
+
+//       const urls = await Promise.all(uploadPromises);
+
+//       // Field names-ka halkan ayaa muhiim ah si ay ugu dhashaan sidii sawirkaaga
+//       await addDoc(collection(db, 'products'), {
+//         title: formData.title,
+//         description: formData.description,
+//         price: parseFloat(formData.price),
+//         category: formData.category,
+//         city: formData.city,
+//         condition: formData.condition,
+//         isNegotiable: formData.isNegotiable,
+//         image_urls: urls, // Sida ku qoran db
+//         status: 'pending',
+//         created_at: serverTimestamp(),
+//         seller_id: user.uid,
+//         seller_name: user.displayName || user.email?.split('@')[0],
+//         views: 0,
+//         ...extraFields // Halkan waxaa ku daramaya make, model, year, iwm.
+//       });
+
+//       setIsSuccess(true);
+//       setTimeout(() => router.push('/'), 1500);
+//     } catch (err: any) {
+//       setError(err.message);
+//       setIsSubmitting(false);
+//     }
+//   };
+
+//   if (isSuccess) return <div className="min-h-screen flex items-center justify-center font-black text-green-600"><CheckCircle2 className="mr-2" /> WAA LA XAREEYAY!</div>;
+
+//   return (
+//     <div className="min-h-screen bg-[#FAFBFC] p-4">
+//       <div className="max-w-xl mx-auto bg-white rounded-[32px] p-6 shadow-sm border border-slate-100">
+//         <button onClick={() => router.back()} className="flex items-center text-slate-400 font-bold mb-6 text-sm"><ArrowLeft size={16} className="mr-1" /> Back</button>
+        
+//         <h1 className="text-2xl font-black mb-6">Create Listing</h1>
+
+//         <form onSubmit={handleSubmit} className="space-y-5">
+//           {/* Images */}
+//           <div className="grid grid-cols-5 gap-2">
+//             {selectedImages.map((f, i) => (
+//               <div key={i} className="relative aspect-square rounded-lg overflow-hidden border">
+//                 <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" alt="preview" />
+//                 <button type="button" onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-black/50 text-white p-1"><X size={10} /></button>
+//               </div>
+//             ))}
+//             {selectedImages.length < 5 && (
+//               <label className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer bg-slate-50"><Upload size={18} className="text-slate-300" /><input type="file" multiple onChange={(e) => e.target.files && setSelectedImages(prev => [...prev, ...Array.from(e.target.files!)])} className="hidden" accept="image/*" /></label>
+//             )}
+//           </div>
+
+//           <div className="grid grid-cols-2 gap-3">
+//             <select className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm border-none" value={formData.category} onChange={e => { setFormData({...formData, category: e.target.value}); setExtraFields({}); }} required>
+//               <option value="">Category</option>
+//               {Object.keys(categoryConfigs).map(k => <option key={k} value={k}>{categoryConfigs[k].label}</option>)}
+//             </select>
+//             <select className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm border-none" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value})}>
+//               <option value="New">New</option>
+//               <option value="Used">Used</option>
+//             </select>
+//           </div>
+
+//           {/* Dynamic Extra Fields (Directly in main object) */}
+//           {categoryConfigs[formData.category] && (
+//             <div className="p-4 bg-slate-50/50 rounded-2xl grid grid-cols-2 gap-3">
+//               {categoryConfigs[formData.category].fields.map(f => (
+//                 <input key={f.name} placeholder={f.label} className="p-3 bg-white rounded-lg outline-none font-bold text-xs border border-slate-100 shadow-sm" onChange={e => setExtraFields({...extraFields, [f.name]: e.target.value})} required />
+//               ))}
+//             </div>
+//           )}
+
+//           <input placeholder="Ad Title" className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, title: e.target.value})} required />
+          
+//           <div className="grid grid-cols-2 gap-3">
+//             <input placeholder="Price ($)" type="number" className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, price: e.target.value})} required />
+//             <input placeholder="City" className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, city: e.target.value})} required />
+//           </div>
+
+//           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+//             <span className="font-bold text-slate-700 text-xs">Negotiable (Gorgortan)</span>
+//             <button type="button" onClick={() => setFormData({...formData, isNegotiable: !formData.isNegotiable})} className={`w-10 h-5 rounded-full relative transition-colors ${formData.isNegotiable ? 'bg-slate-900' : 'bg-slate-300'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${formData.isNegotiable ? 'left-5' : 'left-1'}`} /></button>
+//           </div>
+
+//           <textarea placeholder="Description..." rows={3} className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm resize-none" onChange={e => setFormData({...formData, description: e.target.value})} required />
+
+//           <Button type="submit" disabled={isSubmitting} className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-lg">
+//             {isSubmitting ? "XAREYNTA..." : "POST NOW"}
+//           </Button>
+//         </form>
+//       </div>
+//     </div>
+//   );
+// }
 'use client';
 
 import React, { useState } from 'react';
@@ -555,193 +753,370 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/firebase';
 import { createClient } from '@supabase/supabase-js';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Upload, AlertCircle, X, CheckCircle2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Upload,
+  X,
+  CheckCircle2,
+  Loader2,
+} from 'lucide-react';
 
+/* =========================
+   SUPABASE
+========================= */
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Configuration la mid ah Database-kaaga
-const categoryConfigs: Record<string, { label: string; fields: { name: string; label: string; type: string; placeholder: string }[] }> = {
-  electronics: { 
-    label: "Electronics", 
+/* =========================
+   LIMIT CONFIG
+========================= */
+const FREE_AD_LIMIT = 3;
+
+/* =========================
+   CATEGORY CONFIGS (Sidii hore + Vehicles Updated)
+========================= */
+const categoryConfigs: Record<
+  string,
+  { label: string; fields: { name: string; label: string }[] }
+> = {
+  electronics: {
+    label: 'Electronics',
     fields: [
-      { name: 'brand', label: 'Brand', type: 'text', placeholder: 'Tecno' },
-      { name: 'model', label: 'Model', type: 'text', placeholder: 'm4' },
-      { name: 'color', label: 'Color', type: 'text', placeholder: 'Black' }
-    ] 
+      { name: 'brand', label: 'Brand' },
+      { name: 'model', label: 'Model' },
+      { name: 'color', label: 'Color' },
+    ],
   },
-  vehicles: { 
-    label: "Vehicles", 
+  vehicles: {
+    label: 'Vehicles',
     fields: [
-      { name: 'make', label: 'Nooca Gaariga', type: 'text', placeholder: 'Toyota' }, 
-      { name: 'model', label: 'Model', type: 'text', placeholder: 'Corolla' }, 
-      { name: 'year', label: 'Sanadka', type: 'text', placeholder: '2023' },
-      { name: 'km', label: 'km', type: 'text', placeholder: '0' }
-    ] 
+      { name: 'model', label: 'Baabuurka Noociisa (Model)' },
+    ],
   },
-  // property: { 
-  //   label: "Property", 
-  //   fields: [
-  //     { name: 'phone_verification', label: 'Phone', type: 'text', placeholder: '+252...' },
-  //     { name: 'size', label: 'Size', type: 'text', placeholder: '120sqm' }
-  //   ] 
-  // },
-  property: { 
-    label: "Property & Real Estate", 
+  property: {
+    label: 'Property & Real Estate',
     fields: [
-      { name: 'property_type', label: 'Nooca (House, Apartment, Land)', type: 'text', placeholder: 'e.g. Apartment' },
-      { name: 'phone_verification', label: 'Phone Number', type: 'text', placeholder: '+252...' },
-      { name: 'bedrooms', label: 'Qolalka Jiifka (Bedrooms)', type: 'text', placeholder: '3' },
-      { name: 'bathrooms', label: 'Musqulaha (Bathrooms)', type: 'text', placeholder: '2' },
-      { name: 'size', label: 'Baaxadda (Size)', type: 'text', placeholder: '120sqm ama 20x20' },
-    ] 
+      { name: 'bedrooms', label: 'Bedrooms' },
+      { name: 'bathrooms', label: 'Bathrooms' },
+      { name: 'size', label: 'Size' },
+    ],
   },
-  furniture: { label: "Furniture", fields: [{ name: 'material', label: 'Maaddada', type: 'text', placeholder: 'Kursi' }] },
-  fashions: { label: "Fashions", fields: [{ name: 'size', label: 'Size', type: 'text', placeholder: 'XL' }] },
-  beauty: { label: "Beauty", fields: [{ name: 'type', label: 'Nooca', type: 'text', placeholder: 'Cream' }] },
-  construction: { label: "Construction", fields: [{ name: 'item_type', label: 'Agabka', type: 'text', placeholder: 'Tools' }] },
-  services: { label: "Services", fields: [{ name: 'service_type', label: 'Nooca Adeegga', type: 'text', placeholder: 'Maintenance' }] }
+  furniture: { label: 'Furniture', fields: [] },
+  fashions: { label: 'Fashion & Beauty', fields: [] },
+  construction: { label: 'Construction & Repairs', fields: [] },
+  services: { label: 'General Services', fields: [] },
 };
 
+const subCategoryConfigs: Record<string, { value: string; label: string }[]> = {
+  electronics: [
+    { value: 'phones', label: 'Phones' },
+    { value: 'laptops', label: 'Laptops' },
+    { value: 'tvs', label: 'TVs' },
+    { value: 'accessories', label: 'Accessories' },
+  ],
+  vehicles: [
+    { value: 'cars', label: 'Cars' },
+    { value: 'bajaaj', label: 'Bajaaj' },
+    { value: 'motorcycles', label: 'Motorcycles' },
+    { value: 'trucks', label: 'Trucks & Trailers' },
+  ],
+  property: [
+    { value: 'house', label: 'Guryo Kiro ah(Vila for rent)' },
+    { value: 'apartment', label: 'Apartment for Rent' },
+    { value: 'guest', label: 'Guest House' },
+    { value: 'hotel', label: 'Hotels' },
+  ],
+};
+
+/* =========================
+   PAGE
+========================= */
 export default function CreateListingPage() {
   const router = useRouter();
   const { user } = useAuth();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState('');
+
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  
-  const [formData, setFormData] = useState({ 
-    title: '', description: '', price: '', category: '', city: '', 
-    condition: 'New', isNegotiable: false 
-  });
   const [extraFields, setExtraFields] = useState<Record<string, string>>({});
 
-  const compressImageNative = (file: File): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let w = img.width, h = img.height, max = 1200;
-          if (w > h ? w > max : h > max) { if (w > h) { h *= max / w; w = max; } else { w *= max / h; h = max; } }
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d')?.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((b) => resolve(b as Blob), 'image/jpeg', 0.8);
-        };
-      };
-    });
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    price: '',
+    category: '',
+    subcategory: '',
+    city: '',
+    condition: 'Used', // Default
+    priceType: 'Negotiable', // Default: Fixed ama Negotiable
+  });
+
+  /* =========================
+      CHECK FREE LIMIT
+  ========================= */
+  const checkAdLimit = async () => {
+    if (!user) return false;
+    const q = query(
+      collection(db, 'products'),
+      where('seller_id', '==', user.uid)
+    );
+    const snap = await getDocs(q);
+    return snap.size < FREE_AD_LIMIT;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || selectedImages.length === 0) return setError("Fadlan sawir soo geli.");
+  /* =========================
+      PUBLISH
+  ========================= */
+  const handlePublish = async () => {
+    if (!user || selectedImages.length === 0) {
+      setError('Fadlan sawir ku dar');
+      return;
+    }
+
     setIsSubmitting(true);
+    setError('');
 
     try {
+      const allowed = await checkAdLimit();
+      if (!allowed) {
+        setError(`Waxaad gaartay ${FREE_AD_LIMIT} xayeysiis oo bilaash ah`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const uploadPromises = selectedImages.map(async (file) => {
-        const blob = await compressImageNative(file);
-        const name = `${user.uid}/${Date.now()}-${Math.random().toString(36).substr(7)}.jpg`;
-        await supabase.storage.from('product-images').upload(name, blob);
-        return supabase.storage.from('product-images').getPublicUrl(name).data.publicUrl;
+        const name = `${user.uid}/${Date.now()}-${Math.random()}.jpg`;
+        await supabase.storage.from('product-images').upload(name, file);
+        return supabase.storage
+          .from('product-images')
+          .getPublicUrl(name).data.publicUrl;
       });
 
       const urls = await Promise.all(uploadPromises);
 
-      // Field names-ka halkan ayaa muhiim ah si ay ugu dhashaan sidii sawirkaaga
       await addDoc(collection(db, 'products'), {
         title: formData.title,
         description: formData.description,
-        price: parseFloat(formData.price),
+        price: Number(formData.price),
         category: formData.category,
+        subcategory: formData.subcategory,
         city: formData.city,
         condition: formData.condition,
-        isNegotiable: formData.isNegotiable,
-        image_urls: urls, // Sida ku qoran db
+        priceType: formData.priceType,
+        image_urls: urls,
         status: 'pending',
         created_at: serverTimestamp(),
         seller_id: user.uid,
-        seller_name: user.displayName || user.email?.split('@')[0],
-        views: 0,
-        ...extraFields // Halkan waxaa ku daramaya make, model, year, iwm.
+        ...extraFields,
       });
 
       setIsSuccess(true);
-      setTimeout(() => router.push('/'), 1500);
-    } catch (err: any) {
-      setError(err.message);
+      setTimeout(() => router.push('/'), 2000);
+    } catch {
+      setError('Qalad ayaa dhacay');
       setIsSubmitting(false);
     }
   };
 
-  if (isSuccess) return <div className="min-h-screen flex items-center justify-center font-black text-green-600"><CheckCircle2 className="mr-2" /> WAA LA XAREEYAY!</div>;
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-green-600 font-black">
+        <CheckCircle2 className="mr-2" /> Xayeysiinta waa la gudbiyey (Pending)
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFBFC] p-4">
-      <div className="max-w-xl mx-auto bg-white rounded-[32px] p-6 shadow-sm border border-slate-100">
-        <button onClick={() => router.back()} className="flex items-center text-slate-400 font-bold mb-6 text-sm"><ArrowLeft size={16} className="mr-1" /> Back</button>
-        
+      <div className="max-w-xl mx-auto bg-white rounded-[32px] p-6 border">
+
+        <button
+          onClick={() => router.back()}
+          className="flex items-center text-slate-400 font-bold mb-6 text-sm"
+        >
+          <ArrowLeft size={16} className="mr-1" /> Back
+        </button>
+
         <h1 className="text-2xl font-black mb-6">Create Listing</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Images */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-4">
+            {error}
+          </div>
+        )}
+
+        <form className="space-y-5">
+
+          {/* IMAGES */}
           <div className="grid grid-cols-5 gap-2">
-            {selectedImages.map((f, i) => (
-              <div key={i} className="relative aspect-square rounded-lg overflow-hidden border">
-                <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" alt="preview" />
-                <button type="button" onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-black/50 text-white p-1"><X size={10} /></button>
+            {selectedImages.map((img, i) => (
+              <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
+                <img src={URL.createObjectURL(img)} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedImages(p => p.filter((_, idx) => idx !== i))
+                  }
+                  className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
+                >
+                  <X size={10} />
+                </button>
               </div>
             ))}
             {selectedImages.length < 5 && (
-              <label className="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer bg-slate-50"><Upload size={18} className="text-slate-300" /><input type="file" multiple onChange={(e) => e.target.files && setSelectedImages(prev => [...prev, ...Array.from(e.target.files!)])} className="hidden" accept="image/*" /></label>
+              <label className="aspect-square border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer">
+                <Upload size={18} />
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  accept="image/*"
+                  onChange={(e) =>
+                    e.target.files &&
+                    setSelectedImages(p => [...p, ...Array.from(e.target.files!)])
+                  }
+                />
+              </label>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <select className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm border-none" value={formData.category} onChange={e => { setFormData({...formData, category: e.target.value}); setExtraFields({}); }} required>
-              <option value="">Category</option>
-              {Object.keys(categoryConfigs).map(k => <option key={k} value={k}>{categoryConfigs[k].label}</option>)}
-            </select>
-            <select className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm border-none" value={formData.condition} onChange={e => setFormData({...formData, condition: e.target.value})}>
-              <option value="New">New</option>
-              <option value="Used">Used</option>
-            </select>
-          </div>
+          {/* CATEGORY */}
+          <select
+            className="w-full p-4 bg-slate-50 rounded-xl font-bold"
+            value={formData.category}
+            onChange={(e) => {
+              setFormData({ ...formData, category: e.target.value, subcategory: '' });
+              setExtraFields({});
+            }}
+            required
+          >
+            <option value="">Category</option>
+            {Object.entries(categoryConfigs).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
 
-          {/* Dynamic Extra Fields (Directly in main object) */}
+          {/* SUBCATEGORY */}
+          {subCategoryConfigs[formData.category] && (
+            <select
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold"
+              value={formData.subcategory}
+              onChange={(e) =>
+                setFormData({ ...formData, subcategory: e.target.value })
+              }
+              required
+            >
+              <option value="">Subcategory</option>
+              {subCategoryConfigs[formData.category].map(sub => (
+                <option key={sub.value} value={sub.value}>{sub.label}</option>
+              ))}
+            </select>
+          )}
+
+          {/* EXTRA FIELDS (Includes Updated Vehicle Model) */}
           {categoryConfigs[formData.category] && (
-            <div className="p-4 bg-slate-50/50 rounded-2xl grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {categoryConfigs[formData.category].fields.map(f => (
-                <input key={f.name} placeholder={f.label} className="p-3 bg-white rounded-lg outline-none font-bold text-xs border border-slate-100 shadow-sm" onChange={e => setExtraFields({...extraFields, [f.name]: e.target.value})} required />
+                <input
+                  key={f.name}
+                  placeholder={f.label}
+                  className="p-3 bg-slate-50 rounded-lg font-bold text-sm"
+                  onChange={(e) =>
+                    setExtraFields({ ...extraFields, [f.name]: e.target.value })
+                  }
+                />
               ))}
             </div>
           )}
 
-          <input placeholder="Ad Title" className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, title: e.target.value})} required />
-          
+          {/* NEW/USED & FIXED/NEGOTIABLE */}
           <div className="grid grid-cols-2 gap-3">
-            <input placeholder="Price ($)" type="number" className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, price: e.target.value})} required />
-            <input placeholder="City" className="p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm" onChange={e => setFormData({...formData, city: e.target.value})} required />
+             <select 
+               className="p-4 bg-slate-50 rounded-xl font-bold text-sm"
+               value={formData.condition}
+               onChange={(e) => setFormData({...formData, condition: e.target.value})}
+             >
+               <option value="New">New</option>
+               <option value="Used">Used</option>
+             </select>
+
+             <select 
+               className="p-4 bg-slate-50 rounded-xl font-bold text-sm"
+               value={formData.priceType}
+               onChange={(e) => setFormData({...formData, priceType: e.target.value})}
+             >
+               <option value="Fixed">Fixed Price</option>
+               <option value="Negotiable">Negotiable</option>
+             </select>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <span className="font-bold text-slate-700 text-xs">Negotiable (Gorgortan)</span>
-            <button type="button" onClick={() => setFormData({...formData, isNegotiable: !formData.isNegotiable})} className={`w-10 h-5 rounded-full relative transition-colors ${formData.isNegotiable ? 'bg-slate-900' : 'bg-slate-300'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${formData.isNegotiable ? 'left-5' : 'left-1'}`} /></button>
-          </div>
+          <input placeholder="Title" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
+            onChange={e => setFormData({ ...formData, title: e.target.value })} required />
 
-          <textarea placeholder="Description..." rows={3} className="w-full p-4 bg-slate-50 rounded-xl outline-none font-bold text-sm resize-none" onChange={e => setFormData({...formData, description: e.target.value})} required />
+          <input placeholder="Price ($)" type="number" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
+            onChange={e => setFormData({ ...formData, price: e.target.value })} required />
 
-          <Button type="submit" disabled={isSubmitting} className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-lg">
-            {isSubmitting ? "XAREYNTA..." : "POST NOW"}
+          <input placeholder="City" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
+            onChange={e => setFormData({ ...formData, city: e.target.value })} required />
+
+          <textarea placeholder="Description" rows={3}
+            className="w-full p-4 bg-slate-50 rounded-xl font-bold resize-none"
+            onChange={e => setFormData({ ...formData, description: e.target.value })} required />
+
+          <Button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-lg"
+          >
+            Preview Ad
           </Button>
         </form>
+
+        {/* PREVIEW MODAL */}
+        {showPreview && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white max-w-md w-full rounded-2xl p-6 space-y-4">
+              <h2 className="font-black text-lg">Ad Preview</h2>
+              <p className="font-bold">{formData.title}</p>
+              <p className="text-sm text-slate-500">{formData.city} | {formData.condition}</p>
+              <p className="font-black">${formData.price} ({formData.priceType})</p>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowPreview(false)}>
+                  Edit
+                </Button>
+                <Button
+                  onClick={handlePublish}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-slate-900 text-white"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2" /> Publishing...
+                    </>
+                  ) : (
+                    'Confirm & Publish'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

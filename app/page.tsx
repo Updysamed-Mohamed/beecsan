@@ -479,19 +479,33 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'newest' | 'price-low' | 'price-high'>('newest');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
+  const [showSubModal, setShowSubModal] = useState(false);
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [filterCity, setFilterCity] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [condition, setCondition] = useState('');
 
   const categories = [
     { id: 'electronics', label: 'Electronics', emoji: '📱' },
     { id: 'furniture', label: 'Furniture', emoji: '🪑' },
+    { id: 'property', label: 'property', emoji: '🏠' }  ,
     { id: 'fashions', label: 'Fashions', emoji: '👕' },
     { id: 'vehicles', label: 'Vehicles', emoji: '🚗' },
     { id: 'beauty and personal care', label: 'Beauty', emoji: '💄' },
     { id: 'construction materials', label: 'Construction', emoji: '🏗️' },
     { id: 'general service', label: 'Services', emoji: '📦' },
   ];
+
+  const subCategories: Record<string, string[]> = {
+    electronics: ['phones', 'laptops', 'tvs', 'accessories'],
+    property: ['house', 'apartment', 'guest', 'hotel'],
+    vehicles: ['cars', 'bajaaj', 'motorcycles', 'trucks'],
+    fashions: ['men', 'women'],
+  };
 
   // 1. Fetch Products and Ads
   useEffect(() => {
@@ -546,7 +560,6 @@ export default function HomePage() {
       ? favorites.filter(id => id !== productId)
       : [...favorites, productId];
 
-    // Optimistic Update for instant UI feedback
     setFavorites(newFavorites);
 
     try {
@@ -554,33 +567,75 @@ export default function HomePage() {
       await setDoc(favRef, { productIds: newFavorites }, { merge: true });
     } catch (error) {
       console.error("Failed to update favorites:", error);
-      // Rollback on error
       setFavorites(favorites);
     }
   };
 
+  // Function to handle category click
+  const handleCategoryClick = (catId: string) => {
+    if (selectedCategory === catId) {
+      setSelectedCategory(null);
+      setSelectedSubCategory(null);
+    } else {
+      setSelectedCategory(catId);
+      setSelectedSubCategory(null);
+      // Kaliya fur modal-ka haddii subcategories ay jiraan
+      if (subCategories[catId]) {
+        setShowSubModal(true);
+      }
+    }
+  };
+
   const filteredAndSortedProducts = products
-    .filter((p: Product) => {
-      const isApproved = (p as any).status === 'approved';
-      const isVisible = p.visibility !== 'hidden'; 
-      const searchTerm = searchQuery.toLowerCase().trim();
-      const matchesSearch = searchTerm === '' || 
-        p.title.toLowerCase().includes(searchTerm) ||
-        (p.category || '').toLowerCase().includes(searchTerm) ||
-        (p.city || '').toLowerCase().includes(searchTerm);
+  .filter((p: Product) => {
+    const isApproved = (p as any).status === 'approved';
+    const isVisible = p.visibility !== 'hidden';
 
-      const matchesCategory = !selectedCategory || 
-        (p.category || '').toLowerCase() === selectedCategory.toLowerCase();
+    const searchTerm = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      searchTerm === '' ||
+      p.title.toLowerCase().includes(searchTerm) ||
+      (p.category || '').toLowerCase().includes(searchTerm) ||
+      (p.city || '').toLowerCase().includes(searchTerm);
 
-      return isApproved && isVisible && matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'price-low') return Number(a.price) - Number(b.price);
-      if (sortBy === 'price-high') return Number(b.price) - Number(a.price);
-      const dateA = (a as any).created_at?.seconds || new Date(a.created_at).getTime() || 0;
-      const dateB = (b as any).created_at?.seconds || new Date(b.created_at).getTime() || 0;
-      return dateB - dateA;
-    });
+    const matchesCategory =
+      !selectedCategory ||
+      (p.category || '').toLowerCase() === selectedCategory.toLowerCase();
+
+    const matchesSubCategory =
+      !selectedSubCategory || p.subcategory === selectedSubCategory;
+
+    const matchesCity =
+      !filterCity ||
+      p.city?.toLowerCase().includes(filterCity.toLowerCase());
+
+    const matchesPrice =
+      (!minPrice || Number(p.price) >= Number(minPrice)) &&
+      (!maxPrice || Number(p.price) <= Number(maxPrice));
+
+    const matchesCondition =
+      !condition || p.condition === condition;
+
+    return (
+      isApproved &&
+      isVisible &&
+      matchesSearch &&
+      matchesCategory &&
+      matchesSubCategory &&
+      matchesCity &&
+      matchesPrice &&
+      matchesCondition
+    );
+  })
+  .sort((a, b) => {
+    if (sortBy === 'price-low') return Number(a.price) - Number(b.price);
+    if (sortBy === 'price-high') return Number(b.price) - Number(a.price);
+
+    const dateA = (a as any).created_at?.seconds || new Date(a.created_at).getTime() || 0;
+    const dateB = (b as any).created_at?.seconds || new Date(b.created_at).getTime() || 0;
+
+    return dateB - dateA;
+  });
 
   const displayAds = ads.length > 0 ? ads : [
     { id: 's1', title: 'Beecsan Premium', description: 'Iibi alaabtaada si dhakhso ah', type: 'purple' as const },
@@ -663,22 +718,96 @@ export default function HomePage() {
               <h3 className="text-lg font-bold text-slate-900 tracking-tight">Top Categories</h3>
             </div>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory sm:grid sm:grid-cols-3 lg:grid-cols-6 scroll-smooth">
+          
+          <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory sm:grid sm:grid-cols-3 lg:grid-cols-6 scroll-smooth">
             {categories.map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                onClick={() => handleCategoryClick(cat.id)}
                 className={`group flex flex-col items-center justify-center min-w-[85px] h-[95px] sm:min-w-full sm:h-auto sm:p-8 rounded-[24px] transition-all duration-300 border snap-start ${selectedCategory === cat.id ? 'bg-slate-900 border-slate-900 shadow-lg shadow-slate-200' : 'bg-white border-slate-100 hover:border-primary/30'}`}
               >
-                <div className={`text-2xl sm:text-4xl mb-2 transition-transform group-hover:scale-110`}>{cat.emoji}</div>
+                <div className="text-2xl sm:text-4xl mb-2 transition-transform group-hover:scale-110">{cat.emoji}</div>
                 <span className={`font-black text-[9px] sm:text-[11px] uppercase tracking-tighter transition-colors ${selectedCategory === cat.id ? 'text-white' : 'text-slate-500'}`}>{cat.label}</span>
               </button>
             ))}
           </div>
+
+          {/* ACTIVE SUB-CATEGORY BADGE (Show what is selected) */}
+          {selectedSubCategory && (
+            <div className="flex items-center gap-2 mt-4 px-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Selected:</span>
+              <button 
+                onClick={() => setSelectedSubCategory(null)}
+                className="bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1"
+              >
+                {selectedSubCategory} <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
         </section>
 
+        {/* SUB CATEGORY MODAL */}
+        {showSubModal && selectedCategory && subCategories[selectedCategory] && (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in"
+              onClick={() => setShowSubModal(false)}
+            />
+            
+            {/* Modal Content */}
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-black capitalize">
+                    {categories.find(c => c.id === selectedCategory)?.label}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Select Sub-category</p>
+                </div>
+                <button
+                  onClick={() => setShowSubModal(false)}
+                  className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {subCategories[selectedCategory].map(sub => (
+                  <button
+                    key={sub}
+                    onClick={() => {
+                      setSelectedSubCategory(sub);
+                      setShowSubModal(false);
+                    }}
+                    className={`px-4 py-4 rounded-2xl text-sm font-bold border transition-all text-left flex items-center justify-between group ${
+                      selectedSubCategory === sub
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-slate-50 text-slate-700 border-slate-100 hover:border-primary/30 hover:bg-white'
+                    }`}
+                  >
+                    <span className="capitalize">{sub}</span>
+                    <ChevronRight className={`w-4 h-4 transition-transform ${selectedSubCategory === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                  </button>
+                ))}
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                className="w-full mt-6 rounded-2xl text-slate-400 text-xs font-bold"
+                onClick={() => {
+                  setSelectedSubCategory(null);
+                  setShowSubModal(false);
+                }}
+              >
+                View All {categories.find(c => c.id === selectedCategory)?.label}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* BANNERS */}
-        <section className="max-w-7xl mx-auto py-8 overflow-hidden">
+        <section className="max-w-7xl mx-auto overflow-hidden">
           {loading ? (
             <div className="h-44 bg-slate-100 rounded-[32px] animate-pulse"></div>
           ) : (
@@ -716,6 +845,39 @@ export default function HomePage() {
           )}
         </section>
 
+        {/* FILTERS */}
+        <div className="flex flex-wrap gap-3">
+          <input
+            placeholder="City"
+            value={filterCity}
+            onChange={e => setFilterCity(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-100 text-sm border-none focus:ring-2 focus:ring-primary/20"
+          />
+          <input
+            placeholder="Min Price"
+            type="number"
+            value={minPrice}
+            onChange={e => setMinPrice(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-100 text-sm w-28 border-none"
+          />
+          <input
+            placeholder="Max Price"
+            type="number"
+            value={maxPrice}
+            onChange={e => setMaxPrice(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-100 text-sm w-28 border-none"
+          />
+          <select
+            value={condition}
+            onChange={e => setCondition(e.target.value)}
+            className="px-4 py-2 rounded-full bg-slate-100 text-sm border-none"
+          >
+            <option value="">All Conditions</option>
+            <option value="New">New</option>
+            <option value="Used">Used</option>
+          </select>
+        </div>
+
         {/* PRODUCTS SECTION */}
         <section>
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 border-b border-slate-100 pb-6 gap-4">
@@ -731,8 +893,17 @@ export default function HomePage() {
                  <button onClick={() => setSortBy('newest')} className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${sortBy === 'newest' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Newest</button>
                  <button onClick={() => setSortBy('price-low')} className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all ${sortBy === 'price-low' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Price</button>
               </div>
-              {(selectedCategory || searchQuery) && (
-                <button onClick={() => {setSelectedCategory(null); setSearchQuery('');}} className="text-xs font-bold text-red-500 flex items-center gap-1 px-4 py-2 bg-red-50 rounded-full hover:bg-red-100 transition">Reset <X className="w-3.5 h-3.5" /></button>
+              {(selectedCategory || searchQuery || selectedSubCategory) && (
+                <button 
+                  onClick={() => {
+                    setSelectedCategory(null); 
+                    setSelectedSubCategory(null);
+                    setSearchQuery('');
+                  }} 
+                  className="text-xs font-bold text-red-500 flex items-center gap-1 px-4 py-2 bg-red-50 rounded-full hover:bg-red-100 transition"
+                >
+                  Reset <X className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           </div>
@@ -745,7 +916,7 @@ export default function HomePage() {
             <div className="py-24 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
                 <Search className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                 <h3 className="text-lg font-bold text-slate-800">No approved products found</h3>
-                <Button variant="outline" className="mt-6 rounded-full" onClick={() => {setSearchQuery(''); setSelectedCategory(null);}}>Show all</Button>
+                <Button variant="outline" className="mt-6 rounded-full" onClick={() => {setSearchQuery(''); setSelectedCategory(null); setSelectedSubCategory(null);}}>Show all</Button>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10">
@@ -762,7 +933,7 @@ export default function HomePage() {
         </section>
       </main>
 
-             <footer className="bg-surface border-t border-border pt-16 pb-8">
+      <footer className="bg-surface border-t border-border pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-16 mb-16">
             <div className="col-span-2 space-y-6">
@@ -820,7 +991,6 @@ function ProductCard({ product, isFavorite, onFavoriteToggle }: ProductCardProps
         <img src={displayImage} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
         <div className="absolute top-4 left-4"><span className="bg-white/90 backdrop-blur-md text-[9px] font-black px-2.5 py-1.5 rounded-lg text-slate-900 uppercase tracking-tighter shadow-sm">Verified</span></div>
         
-        {/* Updated Favorite Button with stopPropagation */}
         <button 
           onClick={(e) => { 
             e.stopPropagation(); 

@@ -91,6 +91,7 @@ export interface User {
 }
 
 export interface Product {
+  subcategory: string;
   visibility: string;
   id: string;
   sellerId: string;
@@ -106,7 +107,7 @@ export interface Product {
   city: string;
   image_urls: string[];
   specifications?: string[];
-  status: 'available' | 'sold' | 'disabled';
+  status: 'approved' | 'sold' | 'disabled';
   views: number;
   favorites: number;
   location: string;
