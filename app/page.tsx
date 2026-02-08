@@ -740,7 +740,7 @@ export default function HomePage() {
       ) : (
         <div className="flex items-center gap-1 sm:gap-2">
           <Button variant="ghost" size="sm" onClick={() => router.push('/auth/login')} className="text-xs sm:text-sm font-bold">Login</Button>
-          <Button size="sm" onClick={() => router.push('/auth/register')} className="bg-slate-900 text-white rounded-full text-xs sm:text-sm px-3 sm:px-6">Join</Button>
+          <Button size="sm" onClick={() => router.push('/auth/register')} className="bg-slate-900 text-white rounded-full text-xs sm:text-sm px-3 sm:px-6">New Add</Button>
         </div>
       )}
     </div>
