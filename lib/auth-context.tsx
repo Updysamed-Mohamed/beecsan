@@ -122,7 +122,6 @@
 //   if (!context) throw new Error('useAuth must be used within AuthProvider');
 //   return context;
 // };
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -134,7 +133,7 @@ import {
   sendEmailVerification,
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'; // Ku dar onSnapshot
 import type { User } from './types';
 
 interface AuthContextType {
@@ -156,34 +155,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 🛡️ Debugging logs
   useEffect(() => {
-    console.log("Auth State Changed - User:", user?.email, "Role:", user?.role, "Loading:", loading);
+    console.log("Auth State Changed - User:", user?.email, "Role:", user?.role, "Status:", user?.status, "Loading:", loading);
   }, [user, loading]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
-      setLoading(true); // Bilow loading mar kasta oo auth isbeddelo
+    let unsubscribeSnapshot: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fUser) => {
+      setLoading(true);
+      
       if (fUser) {
         setFirebaseUser(fUser);
-        try {
-          const userDoc = await getDoc(doc(db, 'users', fUser.uid));
-          if (userDoc.exists()) {
-            const userData = { ...userDoc.data(), uid: fUser.uid } as User;
-            setUser(userData);
+        
+        // 🚀 LIVE LISTENER: Waxaan la soconaynaa haddii user-ka la block gareeyo
+        const userRef = doc(db, 'users', fUser.uid);
+        unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = { ...docSnap.data(), uid: fUser.uid } as User;
+            
+            // 🛑 CHECK STATUS: Haddii uu yahay blocked, logout ka dhig
+            if (userData.status === 'blocked') {
+              console.warn("User is blocked. Logging out...");
+              firebaseSignOut(auth);
+              setUser(null);
+              setFirebaseUser(null);
+              // Waxaad ku dari kartaa redirect haddii aad rabto: window.location.href = '/auth/login?error=blocked';
+            } else {
+              setUser(userData);
+            }
           }
-        } catch (error) {
-          console.error("Error fetching user doc:", error);
-        }
+          setLoading(false);
+        }, (error) => {
+          console.error("Snapshot error:", error);
+          setLoading(false);
+        });
+
       } else {
         setUser(null);
         setFirebaseUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
-    // 1. Marka hore Login ka dhig Firebase
     const { user: fUser } = await signInWithEmailAndPassword(auth, email, password);
     
     if (!fUser.emailVerified) {
@@ -191,7 +211,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Fadlan marka hore email-kaaga xaqiiji (Check your inbox).');
     }
 
-    // 2. ISLA MARKAANA soo qaad xogta Firestore (Ha sugin useEffect-ka kale)
     const userDoc = await getDoc(doc(db, 'users', fUser.uid));
     if (!userDoc.exists()) {
       throw new Error('Xogta isticmaalaha lama helin.');
@@ -199,7 +218,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const userData = { ...userDoc.data(), uid: fUser.uid } as User;
     
-    // 3. Update-garee state-ka ka hor inta aadan soo celin
+    // 🛑 Hubi in uusan blocked ahayn xitaa xilliga login-ka
+    if (userData.status === 'blocked') {
+      await firebaseSignOut(auth);
+      throw new Error('Akoonkan waa laga xannibay nidaamka. Fadlan la xiriir admin-ka.');
+    }
+
     setUser(userData);
     setFirebaseUser(fUser);
     
@@ -216,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fullName,
       phone,
       role: 'user', 
+      status: 'active', // Hubi in status-ka bilowga uu yahay active
       rating: 0,
       totalProducts: 0,
       completedSales: 0,

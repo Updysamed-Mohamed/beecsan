@@ -1,4 +1,3 @@
-// Changed to 'use client' so onSnapshot works in the browser
 'use client' 
 
 import {
@@ -12,23 +11,19 @@ import {
   query,
   orderBy,
   type Unsubscribe,
-  serverTimestamp, // Better for Firebase dates
+  serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './firebase'
 
-// Type for snapshot callback
 type SnapshotCallback = (snapshot: any) => void
 
 // --- Real-time listeners for collections ---
 
 export function onProductsUpdate(callback: SnapshotCallback): Unsubscribe {
-  // FIXED: Changed 'createdAt' to 'created_at' to match your Firestore screenshot
   return onSnapshot(
     query(collection(db, 'products'), orderBy('created_at', 'desc')),
     callback,
-    (error) => {
-      console.error("Products Listener Error:", error);
-    }
+    (error) => console.error("Products Listener Error:", error)
   )
 }
 
@@ -41,16 +36,19 @@ export function onUsersUpdate(callback: SnapshotCallback): Unsubscribe {
 }
 
 export function onReportsUpdate(callback: SnapshotCallback): Unsubscribe {
+  // Waxaan hubinaynaa inuu u habaysan yahay taariikhda report-yada cusub
   return onSnapshot(
     query(collection(db, 'reports'), orderBy('createdAt', 'desc')),
-    callback
+    callback,
+    (error) => console.error("Reports Listener Error:", error)
   )
 }
 
 export function onBannersUpdate(callback: SnapshotCallback): Unsubscribe {
   return onSnapshot(
     query(collection(db, 'banners'), orderBy('createdAt', 'desc')),
-    callback
+    callback,
+    (error) => console.error("Banners Listener Error:", error)
   )
 }
 
@@ -81,9 +79,21 @@ export async function updateProductStatus(productId: string, status: string, rej
 }
 
 /**
- * UPDATED: Handles active/blocked status
- * This will create the 'status' field if it doesn't exist (as seen in your screenshot)
+ * CUSUB: Function-ka loogu talagalay in lagu bedelo heerka report-ka (Pending -> Reviewed -> Resolved)
  */
+export async function updateReportStatus(reportId: string, status: string) {
+  try {
+    const reportRef = doc(db, 'reports', reportId);
+    await updateDoc(reportRef, { 
+      status: status,
+      updatedAt: serverTimestamp() 
+    });
+  } catch (error) {
+    console.error("Error updating report status:", error);
+    throw error;
+  }
+}
+
 export async function updateUserStatus(userId: string, status: 'active' | 'blocked') {
   try {
     const userRef = doc(db, 'users', userId);
@@ -123,10 +133,10 @@ export async function deleteBanner(bannerId: string) {
 
 export async function createBanner(bannerData: Record<string, unknown>) {
   const bannersRef = collection(db, 'banners')
-  const newDocRef = doc(bannersRef) // Generates a unique ID
+  const newDocRef = doc(bannersRef) 
   return await setDoc(newDocRef, {
     ...bannerData,
-    createdAt: serverTimestamp(), // Use serverTimestamp for consistent dates
+    createdAt: serverTimestamp(), 
   })
 }
 
@@ -138,5 +148,22 @@ export async function deleteProductAndReport(productId: string, reportId: string
   } catch (error) {
     console.error("Batch delete failed:", error)
     throw error
+  }
+}
+
+// Ku dar intan firebase-admin.ts
+export async function sendNotification(userId: string, title: string, message: string) {
+  try {
+    const notifRef = collection(db, 'notifications');
+    const newNotif = doc(notifRef);
+    await setDoc(newNotif, {
+      userId: userId,
+      title: title,
+      message: message,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Notification Error:", error);
   }
 }

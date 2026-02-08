@@ -435,6 +435,7 @@
 //     </div>
 //   );
 // }
+
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -450,7 +451,8 @@ import { Button } from '@/components/ui/button';
 import type { Product } from '@/lib/types';
 import { 
   Heart, Search, Plus, MessageCircle, MapPin, 
-  Star, Zap, Shield, LayoutGrid, ChevronRight, X
+  Star, Zap, Shield, LayoutGrid, ChevronRight, X,
+  Bell 
 } from 'lucide-react';
 
 interface AdBanner {
@@ -531,22 +533,33 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  // 2. Real-time Favorites Sync from Firestore
+ // 2. Real-time Favorites Sync from Firestore
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) { // Hubi in user-ku jiro
       setFavorites([]);
+      setLoading(false);
       return;
     }
 
     const favRef = doc(db, 'favorites', user.uid);
-    const unsubscribe = onSnapshot(favRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setFavorites(docSnap.data().productIds || []);
+    
+    // Ku dar snapshot listener-ka
+    const unsubscribe = onSnapshot(favRef, 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setFavorites(docSnap.data().productIds || []);
+        } else {
+          setFavorites([]); // Haddii uusan jirin document, waxba ha muujin
+        }
+      }, 
+      (error) => {
+        // Halkan ayuu error-ka kugu qabanayaa haddii rules-ka diidaan
+        console.error("Favorites listener error:", error);
       }
-    });
+    );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]); // Adeegso user.uid si uu u ahaado mid dhab ah
 
   // 3. Favorite Toggle Function
   const handleFavoriteToggle = async (productId: string) => {
@@ -664,50 +677,75 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#FAFBFC] text-slate-900">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2 sm:gap-4">
-          <Link href="/" className="flex items-center shrink-0">
-            <img src="/logo_becsan.png" alt="Beecsan Logo" className="h-14 w-auto sm:h-20 object-contain" />
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-2 sm:gap-4">
+    
+    {/* Logo */}
+    <Link href="/" className="flex items-center shrink-0">
+      <img src="/logo_becsan.png" alt="Beecsan Logo" className="h-14 w-auto sm:h-20 object-contain" />
+    </Link>
+
+    {/* Search Bar - Waxay noqonaysaa mid yaraata mobile-ka si boos loo helo */}
+    <div className="flex-1 max-w-lg relative group">
+      <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <input
+        type="text"
+        placeholder="Search..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full pl-9 sm:pl-10 pr-8 py-2.5 bg-slate-100 rounded-full text-xs sm:text-sm outline-none focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all"
+      />
+      {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1">
+            <X className="w-3 h-3 text-slate-500" />
+          </button>
+      )}
+    </div>
+
+    {/* Right Actions */}
+    <div className="flex items-center gap-1 sm:gap-3">
+      {user ? (
+        <>
+          {/* NOTIFICATION BELL - Lagu daray halkan */}
+          <Link 
+            href="/notifications" 
+            className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors shrink-0"
+          >
+            <Bell className="w-5 h-5" />
+            {/* Red Dot (Wuxuu muuqanayaa kaliya haddii fariin jirto) */}
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
           </Link>
 
-          <div className="flex-1 max-w-lg relative group">
-            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 sm:pl-10 pr-8 py-2.5 bg-slate-100 rounded-full text-xs sm:text-sm outline-none focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all"
-            />
-            {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1">
-                  <X className="w-3 h-3 text-slate-500" />
-                </button>
-            )}
-          </div>
+          {/* MESSAGES */}
+          <Link href="/messages" className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition shrink-0">
+            <MessageCircle className="w-5 h-5" />
+          </Link>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            {user ? (
-              <>
-                <Link href="/messages" className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition">
-                  <MessageCircle className="w-5 h-5" />
-                </Link>
-                <Button onClick={() => router.push('/listings/create')} className="bg-primary hover:bg-primary/90 text-white rounded-full shadow-md shadow-primary/20 h-10 w-10 p-0 md:w-auto md:px-6">
-                  <Plus className="w-5 h-5 md:mr-2" />
-                  <span className="hidden md:inline">Post Ad</span>
-                </Button>
-                <div onClick={() => router.push('/profile')} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-slate-100 cursor-pointer overflow-hidden shrink-0">
-                  <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`} alt="profile" />
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Button variant="ghost" size="sm" onClick={() => router.push('/auth/login')} className="text-xs sm:text-sm font-bold">Login</Button>
-                <Button size="sm" onClick={() => router.push('/auth/register')} className="bg-slate-900 text-white rounded-full text-xs sm:text-sm px-3 sm:px-6">Register</Button>
-              </div>
-            )}
+          {/* POST AD BUTTON */}
+          <Button 
+            onClick={() => router.push('/listings/create')} 
+            className="bg-primary hover:bg-primary/90 text-white rounded-full shadow-md shadow-primary/20 h-9 w-9 p-0 md:h-10 md:w-auto md:px-6 shrink-0"
+          >
+            <Plus className="w-5 h-5 md:mr-2" />
+            <span className="hidden md:inline">Post Ad</span>
+          </Button>
+
+          {/* PROFILE */}
+          <div 
+            onClick={() => router.push('/profile')} 
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full ring-2 ring-slate-100 cursor-pointer overflow-hidden shrink-0 ml-1"
+          >
+            <img src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`} alt="profile" />
           </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/auth/login')} className="text-xs sm:text-sm font-bold">Login</Button>
+          <Button size="sm" onClick={() => router.push('/auth/register')} className="bg-slate-900 text-white rounded-full text-xs sm:text-sm px-3 sm:px-6">Join</Button>
         </div>
-      </header>
+      )}
+    </div>
+  </div>
+</header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-12">
         {/* CATEGORIES */}
