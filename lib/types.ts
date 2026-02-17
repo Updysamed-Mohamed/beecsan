@@ -139,3 +139,4 @@ export interface Message {
   status: 'sent' | 'delivered' | 'read';
   isDeleted: boolean;
 }
+

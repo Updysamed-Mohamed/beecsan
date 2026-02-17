@@ -27,7 +27,9 @@ export default function ListingCard({
   isFavorite = false,
 }: ListingCardProps) {
   return (
-    <Link href={`/listings/${id}`}>
+    // <Link href={`/listings/${id}`}>
+    // <Link href={`/listings?id=${id}`}>
+    <Link href="/listings?id=TEST_ID">
       <div className="bg-card rounded-lg overflow-hidden border border-border hover:shadow-lg transition-shadow cursor-pointer h-full">
         <div className="relative aspect-square bg-muted overflow-hidden">
           <Image

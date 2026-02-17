@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -121,5 +124,24 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Show bottom nav ONLY on touch devices (real mobile & app) */
+@media (hover: none) and (pointer: coarse) {
+  .mobile-only {
+    display: block;
+  }
+}
+
+/* Hide on desktop / mouse devices */
+@media (hover: hover) and (pointer: fine) {
+  .mobile-only {
+    display: none;
+  }
+}
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
   }
 }

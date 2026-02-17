@@ -748,7 +748,7 @@
 // }
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/firebase';
@@ -768,6 +768,7 @@ import {
   X,
   CheckCircle2,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 /* =========================
@@ -781,10 +782,10 @@ const supabase = createClient(
 /* =========================
    LIMIT CONFIG
 ========================= */
-const FREE_AD_LIMIT = 3;
+const FREE_AD_LIMIT = 5;
 
 /* =========================
-   CATEGORY CONFIGS (Sidii hore + Vehicles Updated)
+   CATEGORY CONFIGS
 ========================= */
 const categoryConfigs: Record<
   string,
@@ -862,8 +863,63 @@ export default function CreateListingPage() {
     subcategory: '',
     city: '',
     condition: 'Used', // Default
-    priceType: 'Negotiable', // Default: Fixed ama Negotiable
+    priceType: 'Negotiable', // Default
   });
+
+  // Auto-hide error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  /* =========================
+      VALIDATION & PREVIEW CHECK
+  ========================= */
+  const handlePreviewClick = () => {
+    setError('');
+
+    // 1. Check Images
+    if (selectedImages.length === 0) {
+      setError('Fadlan geli ugu yaraan hal sawir.');
+      return;
+    }
+
+    // 2. Check Category
+    if (!formData.category) {
+      setError('Fadlan dooro Category.');
+      return;
+    }
+
+    // 3. Check Subcategory (Only if the category HAS subcategories defined)
+    const hasSubCategories = subCategoryConfigs[formData.category] && subCategoryConfigs[formData.category].length > 0;
+    if (hasSubCategories && !formData.subcategory) {
+      setError('Fadlan dooro Subcategory.');
+      return;
+    }
+
+    // 4. Basic Text Fields
+    if (!formData.title.trim()) {
+      setError('Fadlan qor Ciwaanka (Title).');
+      return;
+    }
+    if (!formData.price || Number(formData.price) <= 0) {
+      setError('Fadlan qor Qiimo sax ah.');
+      return;
+    }
+    if (!formData.city.trim()) {
+      setError('Fadlan qor Magaalada (City).');
+      return;
+    }
+    if (!formData.description.trim()) {
+      setError('Fadlan qor Faahfaahin (Description).');
+      return;
+    }
+
+    // If all valid, show preview
+    setShowPreview(true);
+  };
 
   /* =========================
       CHECK FREE LIMIT
@@ -882,38 +938,38 @@ export default function CreateListingPage() {
       PUBLISH
   ========================= */
   const handlePublish = async () => {
-    if (!user || selectedImages.length === 0) {
-      setError('Fadlan sawir ku dar');
-      return;
-    }
+    if (!user) return;
 
     setIsSubmitting(true);
     setError('');
 
     try {
+      // 1. Check Limit
       const allowed = await checkAdLimit();
       if (!allowed) {
-        setError(`Waxaad gaartay ${FREE_AD_LIMIT} xayeysiis oo bilaash ah`);
+        setError(`Waxaad gaartay ${FREE_AD_LIMIT} xayeysiis oo bilaash ah. Fadlan tirtir kuwii hore ama update samee.`);
         setIsSubmitting(false);
+        setShowPreview(false);
         return;
       }
 
+      // 2. Upload Images
       const uploadPromises = selectedImages.map(async (file) => {
         const name = `${user.uid}/${Date.now()}-${Math.random()}.jpg`;
-        await supabase.storage.from('product-images').upload(name, file);
-        return supabase.storage
-          .from('product-images')
-          .getPublicUrl(name).data.publicUrl;
+        const { error: uploadError } = await supabase.storage.from('product-images').upload(name, file);
+        if (uploadError) throw uploadError;
+        return supabase.storage.from('product-images').getPublicUrl(name).data.publicUrl;
       });
 
       const urls = await Promise.all(uploadPromises);
 
+      // 3. Save to Firestore
       await addDoc(collection(db, 'products'), {
         title: formData.title,
         description: formData.description,
         price: Number(formData.price),
         category: formData.category,
-        subcategory: formData.subcategory,
+        subcategory: formData.subcategory || null,
         city: formData.city,
         condition: formData.condition,
         priceType: formData.priceType,
@@ -926,183 +982,275 @@ export default function CreateListingPage() {
 
       setIsSuccess(true);
       setTimeout(() => router.push('/'), 2000);
-    } catch {
-      setError('Qalad ayaa dhacay');
+
+    } catch (err) {
+      console.error(err);
+      setError('Qalad ayaa dhacay intii lagu guda jiray daabacaada.');
       setIsSubmitting(false);
     }
   };
 
+  // if (isSuccess) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center text-green-600 font-black">
+  //       <CheckCircle2 className="mr-2" /> Xayeysiinta waa la gudbiyey (Pending)
+  //     </div>
+  //   );
+  // }
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-green-600 font-black">
-        <CheckCircle2 className="mr-2" /> Xayeysiinta waa la gudbiyey (Pending)
+      <div className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in duration-300">
+        <div className="max-w-sm w-full bg-white rounded-[32px] shadow-2xl border border-slate-100 p-8 text-center">
+          <div className="w-20 h-20 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <CheckCircle2 size={40} strokeWidth={3} />
+          </div>
+          
+          <h2 className="text-2xl font-black text-slate-900 mb-2">
+            Waa la Gudbiyey!
+          </h2>
+          
+          <p className="text-slate-500 font-bold mb-8 leading-relaxed">
+            Xayeysiintaada waa la diray, maamulka ayaa hubin doona (Pending Review).
+          </p>
+
+          <div className="flex items-center justify-center gap-2 text-slate-400 text-sm font-bold bg-slate-50 py-3 rounded-xl">
+            <Loader2 size={16} className="animate-spin text-slate-900" />
+            Dib ayaa laguugu celinayaa...
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFBFC] p-4">
-      <div className="max-w-xl mx-auto bg-white rounded-[32px] p-6 border">
-
-        <button
-          onClick={() => router.back()}
-          className="flex items-center text-slate-400 font-bold mb-6 text-sm"
-        >
-          <ArrowLeft size={16} className="mr-1" /> Back
-        </button>
-
-        <h1 className="text-2xl font-black mb-6">Create Listing</h1>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-bold mb-4">
-            {error}
+    <div className="min-h-screen bg-[#FAFBFC] pb-20">
+      
+      {/* ERROR POPUP (TOAST) */}
+      {error && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in duration-300 w-[90%] max-w-md">
+          <div className="bg-red-500 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={24} className="text-white/90" />
+              <p className="font-bold text-sm leading-tight">{error}</p>
+            </div>
+            <button 
+              onClick={() => setError('')} 
+              className="p-1 hover:bg-white/20 rounded-full transition"
+            >
+              <X size={18} />
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        <form className="space-y-5">
+      <div className="max-w-xl mx-auto bg-white min-h-screen sm:min-h-0 sm:my-4 sm:rounded-[32px] border-x sm:border shadow-sm relative">
 
-          {/* IMAGES */}
-          <div className="grid grid-cols-5 gap-2">
-            {selectedImages.map((img, i) => (
-              <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-                <img src={URL.createObjectURL(img)} className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedImages(p => p.filter((_, idx) => idx !== i))
-                  }
-                  className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded"
-                >
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
-            {selectedImages.length < 5 && (
-              <label className="aspect-square border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer">
-                <Upload size={18} />
-                <input
-                  type="file"
-                  multiple
-                  hidden
-                  accept="image/*"
-                  onChange={(e) =>
-                    e.target.files &&
-                    setSelectedImages(p => [...p, ...Array.from(e.target.files!)])
-                  }
-                />
-              </label>
-            )}
-          </div>
-
-          {/* CATEGORY */}
-          <select
-            className="w-full p-4 bg-slate-50 rounded-xl font-bold"
-            value={formData.category}
-            onChange={(e) => {
-              setFormData({ ...formData, category: e.target.value, subcategory: '' });
-              setExtraFields({});
-            }}
-            required
+        {/* STICKY HEADER */}
+        <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 pt-6 pb-4 rounded-t-[32px]">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center text-slate-500 font-bold mb-3 text-sm hover:text-slate-800 transition"
           >
-            <option value="">Category</option>
-            {Object.entries(categoryConfigs).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
-            ))}
-          </select>
+            <ArrowLeft size={18} className="mr-1" /> Back
+          </button>
+          <h1 className="text-2xl font-black text-slate-900">Create Listing</h1>
+        </div>
 
-          {/* SUBCATEGORY */}
-          {subCategoryConfigs[formData.category] && (
+        <div className="p-6 pt-6">
+          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+            
+            {/* IMAGES */}
+            <div className="grid grid-cols-5 gap-2">
+              {selectedImages.map((img, i) => (
+                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                  <img src={URL.createObjectURL(img)} className="w-full h-full object-cover" alt="preview" />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedImages(p => p.filter((_, idx) => idx !== i))
+                    }
+                    className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-red-500 transition"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {selectedImages.length < 5 && (
+                <label className="aspect-square border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition group">
+                  <Upload size={20} className="text-slate-400 group-hover:text-slate-600 mb-1" />
+                  <span className="text-[10px] font-bold text-slate-400">Add</span>
+                  <input
+                    type="file"
+                    multiple
+                    hidden
+                    accept="image/*"
+                    onChange={(e) =>
+                      e.target.files &&
+                      setSelectedImages(p => [...p, ...Array.from(e.target.files!)])
+                    }
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* CATEGORY */}
             <select
-              className="w-full p-4 bg-slate-50 rounded-xl font-bold"
-              value={formData.subcategory}
-              onChange={(e) =>
-                setFormData({ ...formData, subcategory: e.target.value })
-              }
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+              value={formData.category}
+              onChange={(e) => {
+                setFormData({ ...formData, category: e.target.value, subcategory: '' });
+                setExtraFields({});
+              }}
               required
             >
-              <option value="">Subcategory</option>
-              {subCategoryConfigs[formData.category].map(sub => (
-                <option key={sub.value} value={sub.value}>{sub.label}</option>
+              <option value="">Select Category</option>
+              {Object.entries(categoryConfigs).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
               ))}
             </select>
-          )}
 
-          {/* EXTRA FIELDS (Includes Updated Vehicle Model) */}
-          {categoryConfigs[formData.category] && (
+            {/* SUBCATEGORY */}
+            {subCategoryConfigs[formData.category] && (
+              <select
+                className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+                value={formData.subcategory}
+                onChange={(e) =>
+                  setFormData({ ...formData, subcategory: e.target.value })
+                }
+                required
+              >
+                <option value="">Select Subcategory</option>
+                {subCategoryConfigs[formData.category].map(sub => (
+                  <option key={sub.value} value={sub.value}>{sub.label}</option>
+                ))}
+              </select>
+            )}
+
+            {/* EXTRA FIELDS */}
+            {categoryConfigs[formData.category] && (
+              <div className="grid grid-cols-2 gap-3">
+                {categoryConfigs[formData.category].fields.map(f => (
+                  <input
+                    key={f.name}
+                    placeholder={f.label}
+                    className="p-4 bg-slate-50 rounded-xl font-bold text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+                    onChange={(e) =>
+                      setExtraFields({ ...extraFields, [f.name]: e.target.value })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* NEW/USED & PRICE TYPE */}
             <div className="grid grid-cols-2 gap-3">
-              {categoryConfigs[formData.category].fields.map(f => (
-                <input
-                  key={f.name}
-                  placeholder={f.label}
-                  className="p-3 bg-slate-50 rounded-lg font-bold text-sm"
-                  onChange={(e) =>
-                    setExtraFields({ ...extraFields, [f.name]: e.target.value })
-                  }
-                />
-              ))}
+               <select
+                 className="p-4 bg-slate-50 rounded-xl font-bold text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+                 value={formData.condition}
+                 onChange={(e) => setFormData({...formData, condition: e.target.value})}
+               >
+                 <option value="New">New</option>
+                 <option value="Used">Used</option>
+               </select>
+               <select
+                 className="p-4 bg-slate-50 rounded-xl font-bold text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+                 value={formData.priceType}
+                 onChange={(e) => setFormData({...formData, priceType: e.target.value})}
+               >
+                 <option value="Fixed">Fixed Price</option>
+                 <option value="Negotiable">Negotiable</option>
+               </select>
             </div>
-          )}
 
-          {/* NEW/USED & FIXED/NEGOTIABLE */}
-          <div className="grid grid-cols-2 gap-3">
-             <select 
-               className="p-4 bg-slate-50 rounded-xl font-bold text-sm"
-               value={formData.condition}
-               onChange={(e) => setFormData({...formData, condition: e.target.value})}
-             >
-               <option value="New">New</option>
-               <option value="Used">Used</option>
-             </select>
+            <input 
+              placeholder="Title (e.g. iPhone 14 Pro Max)" 
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+              value={formData.title}
+              onChange={e => setFormData({ ...formData, title: e.target.value })} 
+            />
 
-             <select 
-               className="p-4 bg-slate-50 rounded-xl font-bold text-sm"
-               value={formData.priceType}
-               onChange={(e) => setFormData({...formData, priceType: e.target.value})}
-             >
-               <option value="Fixed">Fixed Price</option>
-               <option value="Negotiable">Negotiable</option>
-             </select>
-          </div>
+            <input 
+              placeholder="Price ($)" 
+              type="number" 
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+              value={formData.price}
+              onChange={e => setFormData({ ...formData, price: e.target.value })} 
+            />
 
-          <input placeholder="Title" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
-            onChange={e => setFormData({ ...formData, title: e.target.value })} required />
+            <input 
+              placeholder="City (e.g. Mogadishu)" 
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+              value={formData.city}
+              onChange={e => setFormData({ ...formData, city: e.target.value })} 
+            />
 
-          <input placeholder="Price ($)" type="number" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
-            onChange={e => setFormData({ ...formData, price: e.target.value })} required />
+            <textarea 
+              placeholder="Description (Describe your item...)" 
+              rows={4}
+              className="w-full p-4 bg-slate-50 rounded-xl font-bold text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition"
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })} 
+            />
 
-          <input placeholder="City" className="w-full p-4 bg-slate-50 rounded-xl font-bold"
-            onChange={e => setFormData({ ...formData, city: e.target.value })} required />
-
-          <textarea placeholder="Description" rows={3}
-            className="w-full p-4 bg-slate-50 rounded-xl font-bold resize-none"
-            onChange={e => setFormData({ ...formData, description: e.target.value })} required />
-
-          <Button
-            type="button"
-            onClick={() => setShowPreview(true)}
-            className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-lg"
-          >
-            Preview Ad
-          </Button>
-        </form>
+            <Button
+              type="button"
+              onClick={handlePreviewClick}
+              className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+            >
+              Preview Ad
+            </Button>
+          </form>
+        </div>
 
         {/* PREVIEW MODAL */}
         {showPreview && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white max-w-md w-full rounded-2xl p-6 space-y-4">
-              <h2 className="font-black text-lg">Ad Preview</h2>
-              <p className="font-bold">{formData.title}</p>
-              <p className="text-sm text-slate-500">{formData.city} | {formData.condition}</p>
-              <p className="font-black">${formData.price} ({formData.priceType})</p>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60] backdrop-blur-sm">
+            <div className="bg-white max-w-md w-full rounded-[24px] p-6 space-y-5 shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="flex justify-between items-center border-b pb-3 border-dashed border-slate-200">
+                <h2 className="font-black text-xl text-slate-900">Review Listing</h2>
+                <button onClick={() => setShowPreview(false)} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200">
+                  <X size={16} />
+                </button>
+              </div>
+              
+              <div className="space-y-1">
+                 <p className="text-xs text-blue-600 uppercase font-black tracking-wider bg-blue-50 inline-block px-2 py-1 rounded">
+                   {categoryConfigs[formData.category]?.label}
+                 </p>
+                 <p className="font-bold text-2xl text-slate-900 leading-tight pt-2">{formData.title}</p>
+              </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setShowPreview(false)}>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 font-semibold">
+                <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-slate-300 mr-2"></span>{formData.city}</span>
+                <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-slate-300 mr-2"></span>{formData.condition}</span>
+                {formData.subcategory && (
+                   <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-slate-300 mr-2"></span>{formData.subcategory}</span>
+                )}
+              </div>
+              
+              <div className="flex items-baseline gap-2">
+                <p className="font-black text-3xl text-slate-900">${Number(formData.price).toLocaleString()}</p>
+                <span className="text-sm font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">{formData.priceType}</span>
+              </div>
+              
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-sm text-slate-600 font-medium whitespace-pre-line line-clamp-4">
+                  {formData.description}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 font-bold border-2 border-slate-100 h-12 rounded-xl hover:bg-slate-50 hover:text-slate-900" 
+                  onClick={() => setShowPreview(false)}
+                >
                   Edit
                 </Button>
                 <Button
                   onClick={handlePublish}
                   disabled={isSubmitting}
-                  className="flex-1 bg-slate-900 text-white"
+                  className="flex-1 bg-slate-900 text-white font-bold h-12 rounded-xl hover:bg-slate-800"
                 >
                   {isSubmitting ? (
                     <>
